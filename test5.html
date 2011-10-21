@@ -1,0 +1,155 @@
+<html>
+<head>
+</head>
+<body>
+<pre id="1">
+東京タワー 35.658570 139.745484
+青葉城跡 38.251127 140.855294
+五稜郭 41.796868 140.756794
+日光東照宮 36.758051 139.598899
+秋吉台 34.234753 131.310094
+原爆ドーム 34.395477 132.453620
+</pre>
+</body>
+</html>
+<script>
+function sendRequest(url,callback,postData) {
+	var req = createXMLHTTPObject();
+	if (!req) return;
+	var method = (postData) ? "POST" : "GET";
+	req.open(method,url,false);
+	req.setRequestHeader('User-Agent','XMLHTTP/1.0');
+	if (postData)
+		req.setRequestHeader('Content-type','application/x-www-form-urlencoded');
+	req.onreadystatechange = function () {
+		if (req.readyState != 4) return;
+		if (req.status != 200 && req.status != 304) {
+//			alert('HTTP error ' + req.status);
+			return;
+		}
+		callback(req);
+	}
+	if (req.readyState == 4) return;
+	req.send(postData);
+}
+
+var XMLHttpFactories = [
+	function () {return new XMLHttpRequest()},
+	function () {return new ActiveXObject("Msxml2.XMLHTTP")},
+	function () {return new ActiveXObject("Msxml3.XMLHTTP")},
+	function () {return new ActiveXObject("Microsoft.XMLHTTP")}
+];
+
+function createXMLHTTPObject() {
+	var xmlhttp = false;
+	for (var i=0;i<XMLHttpFactories.length;i++) {
+		try {
+			xmlhttp = XMLHttpFactories[i]();
+		}
+		catch (e) {
+			continue;
+		}
+		break;
+	}
+	return xmlhttp;
+}
+element1 = document.getElementById('1');
+function mapData( name, lat, lon ){
+  this.name = name;
+  this.lat = lat;
+  this.lon = lon;
+  this.durationData = [];
+  this.setDuration = function( destination, duration ){
+                       this.durationData[destination] = duration;
+                     };
+  this.getDuration = function( destination ){
+                       return this.durationData[destination];
+                     };
+}
+function getDurationByGoogleAPI( org_lat, org_lon, dest_lat, dest_lon ){
+  var url = 'http://maps.google.com/maps/api/directions/json?origin=' + org_lat + ',' + org_lon + '&destination=' + dest_lat + ',' + dest_lon + '&sensor=false&oe=utf-8';
+  duration = 0;
+  status = "";
+  var handleRequest = function(req) {
+                        json = eval( '(' +  req.responseText + ')' );
+                        status = json.status;
+                        duration = json.routes[0].legs[0].duration.value;
+                      };
+  sendRequest(url,handleRequest);
+  if( 0 == duration ){
+    alert( status );
+  } else {
+    alert( duration );
+  }
+  return duration;
+}
+
+var maps = [];
+var line = element1.innerHTML.split("\n");
+for( var i = 0, ln = line.length; i < ln; i++ ){
+  var data = line[i].split(' ');
+  if( 3 != data.length ){
+    continue;
+  }
+  maps[i] = new mapData( data[0], data[1], data[2] );
+}
+var map_count = maps.length;
+for( var i = 0; i < map_count; i++ ){
+  for( var n = 0; n < map_count; n++ ){
+    if( i == n ){
+      continue;
+    }
+    maps[i].setDuration( n ,getDurationByGoogleAPI( maps[i].lat, maps[i].lon, maps[n].lat, maps[n].lon) );
+  }
+}
+
+var cycles = [];
+function makeCycleData( itemData, strs ){
+  if( 0 == itemData.length ){
+    cycles.push( strs.toString() );
+  } else {
+    for( var i = 0, ln = itemData.length; i < ln; i++ ){
+      var tmp_strs = strs.concat();
+      var tmp_itemData = itemData.concat();
+      tmp_strs.push( itemData[i] );
+      tmp_itemData.splice( i, 1);
+      makeCycleData( tmp_itemData, tmp_strs );
+    } 
+  }
+}
+itemData = [];
+for( var i = 0; i < map_count - 1; i++ ){
+  itemData[i] = i + 1;
+}
+makeCycleData( itemData, [] );
+
+//for( var i = 0, ln = cycles.length; i < ln; i++ ){
+//  element1.textContent += cycles[i] + "\n";
+//}
+var minTime = 0;
+var minTimeCycle = 0;
+for( var i = 0, ln = cycles.length; i < ln; i++ ){
+  var tmpTime = 0; 
+  var items = cycles[i].split(',');
+  items.unshift( 0 );
+  items.push( 0 );
+  for( var n = 0, ln2 = items.length - 1; n < ln2; n++ ){
+    var start = items[n];
+    var end   = items[n+1];
+    tmpTime += maps[start].getDuration( end );
+  }
+  if( 0 == minTime || minTime > tmpTime ){
+    minTime = tmpTime;
+    minTimeCycle = i;
+  }
+}
+
+var names = [];
+var items = cycles[minTimeCycle].split(',');
+items.unshift( 0 );
+items.push( 0 );
+for( var n = 0, ln2 = items.length; n < ln2; n++ ){
+  names.push( maps[items[n]].name );
+}
+element1.textContent += names.join(' ') + "\n";
+</script>
